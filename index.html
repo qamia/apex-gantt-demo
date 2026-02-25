@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>APEX Stand Allocation — Gantt Visualization | Qamia FENNEQ</title>
+  <meta name="description" content="Interactive Gantt chart comparing APEX optimized vs historical aircraft stand allocation at Sharjah International Airport. Powered by Qamia FENNEQ.">
+  <meta property="og:title" content="APEX Stand Allocation — Gantt Visualization">
+  <meta property="og:description" content="172 flights, 46 stands, one busiest day. See how MIP optimization reshapes airport gate management.">
+  <meta property="og:type" content="website">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: { colors: { slate: { 850: '#172033' } } } }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,700;0,9..40,900;1,9..40,400&family=JetBrains+Mono:wght@400;700&display=swap');
+    body { font-family: 'DM Sans', system-ui, sans-serif; margin: 0; }
+    code, .font-mono { font-family: 'JetBrains Mono', monospace; }
+    /* Smooth scroll for insight click */
+    html { scroll-behavior: smooth; }
+    /* Pulse animation for the status dot */
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useMemo } = React;
+    // ═══════════════════════════════════════════════════════════════
+    // APEX v5.7 — Sharjah International Airport
+    // Aug 29, 2025 — Busiest day: 172 OPS + 10 PREDAY = 182 flights
+    // Data: [id, airline, histStand, modelStand, staMin, stdMin, paxout, loadtype, isPreday]
+    // Validated against solver summary files (62/62 days cross-checked)
+    // ═══════════════════════════════════════════════════════════════
+    const R=[["25084862","ABY","36","36",-425,540,102,"Pax",1],["25084894","ABY","37","37",-205,6,204,"Pax",1],["25084906","ABY","6","6",-140,1,169,"Pax",1],["25084914","ABY","38","38",-130,25,218,"Pax",1],["25084915","ABY","14","14",-95,10,166,"Pax",1],["25084912","AXB","22","22",-90,55,171,"Pax",1],["25084918","ABY","29","29",-35,430,118,"Pax",1],["25084917","QTR","5","5",-30,30,81,"Pax",1],["25084919","AXB","35","35",-26,120,109,"Pax",1],["25084920","ABY","8","8",-20,75,157,"Pax",1],["25084922","ABY","6","4",10,80,15,"Pax",0],["25084921","ABY","25","7",10,130,172,"Pax",0],["25084923","RMX","55","53",25,503,0,"Cgo",0],["25084924","AXB","24","16",25,185,109,"Pax",0],["25084925","UBG","7","3",30,90,129,"Pax",0],["25084926","IGO","3","5",55,115,181,"Pax",0],["25084928","ABY","5","6",90,170,178,"Pax",0],["25084927","ABY","14","1B",95,235,174,"Pax",0],["25084931","ABY","26","34",95,285,160,"Pax",0],["25084934","MSR","4","4",120,180,123,"Pax",0],["25084933","ABY","8","3",130,230,140,"Pax",0],["25084932","JAG","53","51",150,270,0,"Cgo",0],["25084939","SYR","7","14",150,241,0,"Pax",0],["25084930","SYR","6","5",150,210,0,"Pax",0],["25084935","ABY","16","7",170,255,55,"Pax",0],["25084936","AXB","3","8",195,255,176,"Pax",0],["25084937","ABY","22","1C",195,305,17,"Pax",0],["25084938","ABY","32","58",205,500,142,"Pax",0],["25084943","PGT","5","6",220,290,165,"Pax",0],["25084940","IGO","4","4",235,295,185,"Pax",0],["25084942","ABY","31","39",240,480,137,"Pax",0],["25084944","ABY","24","5",245,365,63,"Pax",0],["25084941","ABY","21","3",250,350,117,"Pax",0],["25084945","QTR","6","1A",250,340,97,"Pax",0],["25084946","ABY","60","54",260,565,104,"Pax",0],["25084948","AXB","8","7",300,360,180,"Pax",0],["25084949","KQA","57","55",300,540,0,"Cgo",0],["25084947","ABY","7","14",310,420,77,"Pax",0],["25084950","ABY","3","30",330,450,201,"Pax",0],["25084951","ABY","58","52",335,820,93,"Pax",0],["25084956","ABY","25","32",340,450,160,"Pax",0],["25084953","ABY","4","21",345,430,140,"Pax",0],["25084954","ABY","33","60",350,540,162,"Pax",0],["25084952","ABY","16","31",360,455,166,"Pax",0],["25084969","ABY","35","40",375,540,124,"Pax",0],["25084973","SIA","51","51",375,435,0,"Cgo",0],["25084978","PGT","23","16",375,440,156,"Pax",0],["25084970","ABY","21","26",375,470,151,"Pax",0],["25084957","ABY","5","6",380,450,159,"Pax",0],["25084962","ABY","50","35",385,595,167,"Pax",0],["25084960","ABY","26","23",390,475,151,"Pax",0],["25084961","ABY","8","8",395,460,201,"Pax",0],["25084955","ABY","22","3",395,450,125,"Pax",0],["25084974","ABY","34","25",395,490,167,"Pax",0],["25084972","ABY","39","37",400,535,113,"Pax",0],["25084976","ABY","54","56",400,805,61,"Pax",0],["25084968","ABY","38","33",400,500,101,"Pax",0],["25084964","ABY","1A","1A",400,485,171,"Pax",0],["25084958","ABY","37","1B",400,485,166,"Pax",0],["25084959","ABY","30","22",400,470,106,"Pax",0],["25084967","ABY","52","1C",410,490,143,"Pax",0],["25084971","ABY","40","4",420,485,170,"Pax",0],["25084975","ABY","6","5",420,470,200,"Pax",0],["25084963","ABY","14","34",420,490,92,"Pax",0],["25084979","ABY","1B","24",420,525,180,"Pax",0],["25084965","ABY","56","38",425,560,76,"Pax",0],["25084966","AXB","24","7",425,485,179,"Pax",0],["25084982","ABY","4","14",440,525,127,"Pax",0],["25084983","ABY","8","3",490,595,149,"Pax",0],["25084981","RWD","59","51",490,660,0,"Cgo",0],["25084985","FJL","6","8",495,545,173,"Pax",0],["25084984","MSC","7","6",540,600,115,"Pax",0],["25084987","ABY","30","32",545,765,214,"Pax",0],["25084989","ABY","3","5",550,600,93,"Pax",0],["25084986","ETH","61","53",555,640,0,"Cgo",0],["25084990","QTR","4","8",595,680,94,"Pax",0],["25084991","SYR","5","4",605,665,77,"Pax",0],["25084988","ABY","14","7",620,645,87,"Pax",0],["25084992","AXB","22","1B",640,725,150,"Pax",0],["25084994","ABY","7","25",640,730,138,"Pax",0],["25084993","ABY","8","3",645,705,73,"Pax",0],["25084996","ABY","25","26",655,740,92,"Pax",0],["25084997","ABY","21","22",660,795,67,"Pax",0],["25085001","AXB","24","24",665,820,176,"Pax",0],["25084995","ABY","23","6",670,720,131,"Pax",0],["25085002","ABY","3","1A",675,750,120,"Pax",0],["25085006","ABY","33","16",680,775,175,"Pax",0],["25085000","ABY","5","14",700,775,100,"Pax",0],["25084998","ABY","16","4",700,750,145,"Pax",0],["25085003","ABY","29","5",700,765,147,"Pax",0],["25085010","ABY","6","1C",710,790,173,"Pax",0],["25085004","ABY","4","7",715,785,118,"Pax",0],["25084999","ABY","26","21",715,785,44,"Pax",0],["25085007","ABY","31","8",720,785,63,"Pax",0],["25085011","ABY","14","23",725,840,201,"Pax",0],["25085009","ABY","8","3",730,785,121,"Pax",0],["25085012","ABY","36","38",735,1335,205,"Pax",0],["25085008","ABY","34","6",740,800,117,"Pax",0],["25085013","ABY","23","4",800,860,164,"Pax",0],["25085030","SIA","51","53",800,880,0,"Cgo",0],["25085015","MNB","53","51",810,930,0,"Cgo",0],["25085019","ABY","24","8",820,865,109,"Pax",0],["25085033","ABY","7","3",835,910,217,"Pax",0],["25085017","ABY","5","5",835,900,168,"Pax",0],["25085018","FYC","6","6",840,900,135,"Pax",0],["25085032","ABY","3","7",865,930,155,"Pax",0],["25085020","IGO","4","1C",875,935,86,"Pax",0],["25085036","FJL","21","4",880,940,165,"Pax",0],["25085039","ABY","25","8",895,950,130,"Pax",0],["25085035","ABY","14","1B",905,990,171,"Pax",0],["25085031","AXB","22","14",905,1005,94,"Pax",0],["25085034","ABY","16","16",915,1015,160,"Pax",0],["25085028","ABY","8","6",920,975,158,"Pax",0],["25085027","QTR","5","1A",945,1010,45,"Pax",0],["25085023","ABY","26","3",945,995,171,"Pax",0],["25085026","ABY","4","5",955,1020,174,"Pax",0],["25085024","ABY","29","4",960,1075,161,"Pax",0],["25085025","ABY","3","7",970,1055,165,"Pax",0],["25085037","IAW","23","8",1005,1065,45,"Pax",0],["25085022","ABY","7","6",1015,1030,175,"Pax",0],["25085040","ABY","14","1C",1020,1135,173,"Pax",0],["25085021","ABY","31","26",1030,1140,158,"Pax",0],["25085038","ABY","6","14",1035,1140,160,"Pax",0],["25085043","ABY","21","1B",1035,1150,159,"Pax",0],["25085051","KNE","24","3",1040,1100,79,"Pax",0],["25085041","ABY","8","5",1060,1135,175,"Pax",0],["25085060","RMX","53","51",1065,1170,0,"Cgo",0],["25085042","QTR","5","1A",1070,1160,118,"Pax",0],["25085052","ABY","25","6",1085,1135,172,"Pax",0],["25085045","ABY","32","7",1090,1190,88,"Pax",0],["25085087","FDT","57","53",1090,3095,0,"Cgo",0],["25085050","ABY","16","23",1095,1230,74,"Pax",0],["25085049","ABY","3","4",1100,1160,175,"Pax",0],["25085053","ABY","33","40",1100,1280,34,"Pax",0],["25085048","ABQ","4","8",1110,1185,121,"Pax",0],["25085054","AXB","7","3",1130,1190,167,"Pax",0],["25085055","ABY","35","33",1135,1305,158,"Pax",0],["25085056","ABY","30","32",1140,1255,18,"Pax",0],["25085063","ABY","37","29",1170,1330,144,"Pax",0],["25085057","ABY","39","1C",1170,1250,170,"Pax",0],["25085058","SYR","6","5",1170,1230,0,"Pax",0],["25085069","ABY","34","14",1180,1290,201,"Pax",0],["25085059","ABY","22","6",1180,1250,115,"Pax",0],["25085062","ABY","21","31",1185,1695,89,"Pax",0],["25085073","ABY","3","30",1195,1300,179,"Pax",0],["25085067","ABY","52","37",1200,1675,183,"Pax",0],["25085065","ABY","5","4",1205,1260,167,"Pax",0],["25085064","QTR","4","1B",1220,1285,126,"Pax",0],["25085070","ABY","8","3",1225,1285,173,"Pax",0],["25085061","ABY","29","1A",1225,1295,136,"Pax",0],["25085072","ABY","23","8",1230,1290,174,"Pax",0],["25085066","ABY","24","16",1230,1285,153,"Pax",0],["25085076","ABY","7","21",1235,1330,157,"Pax",0],["25085071","ABY","1C","39",1235,1415,134,"Pax",0],["25085083","ABY","1B","24",1240,1340,169,"Pax",0],["25085068","ABY","38","22",1245,1305,163,"Pax",0],["25085077","ABY","1A","7",1245,1295,148,"Pax",0],["25085079","ABY","25","5",1250,1280,167,"Pax",0],["25085081","ABY","40","34",1250,1360,202,"Pax",0],["25085075","ABY","32","25",1250,1330,163,"Pax",0],["25085074","ABY","26","26",1260,1345,165,"Pax",0],["25085097","KQA","59","51",1260,1679,0,"Cgo",0],["25085084","ABY","31","6",1270,1325,170,"Pax",0],["25085085","ABY","5","23",1280,1335,210,"Pax",0],["25085089","ABY","14","4",1300,1350,161,"Pax",0],["25085082","IGO","30","5",1300,1360,178,"Pax",0],["25085094","ABY","6","3",1310,1390,170,"Pax",0],["25085090","ABY","4","7",1340,1345,22,"Pax",0],["25085092","ABY","33","14",1342,1436,99,"Pax",0],["25085093","ABY","8","8",1345,1395,165,"Pax",0],["25085088","AXB","29","16",1350,1495,169,"Pax",0],["25085086","AXB","22","6",1350,1410,168,"Pax",0],["25085095","PIA","23","1A",1350,1463,84,"Pax",0],["25085098","FJL","24","1B",1375,1488,173,"Pax",0],["25085099","ABY","26","7",1400,1450,163,"Pax",0],["25085105","ABY","14","1C",1405,1520,34,"Pax",0],["25085100","ABY","25","4",1409,1479,133,"Pax",0],["25085096","QTR","7","5",1410,1470,117,"Pax",0],["25085101","ABY","5","3",1420,1465,108,"Pax",0],["25085103","BBC","4","8",1426,1515,115,"Pax",0],["25085104","ABY","16","33",1429,1630,90,"Pax",0],["25085102","ABY","3","6",1435,1515,144,"Pax",0]];
+    const S_PBB=new Set(["3","4","5","6","7","8"]);
+    const S_SHORT=new Set(["1A","1B","1C"]);
+    const S_CARGO=new Set(["50","51","52","53","54","55","56","57","58","59","60","61","62"]);
+    const STAND_ORDER=["3","4","5","6","7","8","1A","1B","1C","14","16","21","22","23","24","25","26","29","30","31","32","33","34","35","36","37","38","39","40","50","51","52","53","54","55","56","57","58","59","60","61","62"];
+    const flights=R.map(r=>({id:r[0],airl:r[1],hs:r[2],ms:r[3],sta:r[4],std:Math.min(r[5],1500),realStd:r[5],pax:r[6],lt:r[7],pre:r[8]===1,gt:r[5]-r[4],lf:r[6]/180}));
+    const pct=(n,d)=>d>0?(n/d*100).toFixed(1):"\u2014";
+    const T_START=-60,T_END=1500,T_RANGE=T_END-T_START;
+    function toTime(m){const h=Math.floor(m/60),mm=m%60,hh=h<0?24+h:h;return`${String(hh%24).padStart(2,"0")}:${String(Math.abs(mm)).padStart(2,"0")}`;}
+    function flightColor(f){
+      if(f.pre)return"#475569";if(f.lt==="Cgo")return"#A8896A";
+      if(f.lf>=0.90&&f.gt<=75)return"#10B981";if(f.gt<=65)return"#38BDF8";
+      if(f.gt>=180)return"#F59E0B";return"#818CF8";
+    }
+    function isInsightFlight(f,insight,mode){
+      if(!insight)return false;const stand=mode==="hist"?f.hs:f.ms;
+      if(insight===1)return!f.pre&&f.lt!=="Cgo"&&f.lf>=0.90&&f.gt<=75;
+      if(insight===2)return!f.pre&&f.lt!=="Cgo"&&(f.gt>=180||S_SHORT.has(stand));
+      if(insight===3)return!f.pre&&f.lt!=="Cgo"&&f.gt<=65;return false;
+    }
+    const INSIGHTS=[
+      {id:1,color:"#10B981",icon:"1",title:"Priority-Aware Gate Assignment",desc:"Green bars = full-load flights (\u226590% LF, \u226475min GT). Toggle views to see them migrate into the PBB zone under APEX.",detail:"Historical: 19/32 on PBB \u2192 APEX: 30/32 on PBB (+34pp)"},
+      {id:2,color:"#F59E0B",icon:"2",title:"Strategic Capacity Management",desc:"Amber bars = long GT (\u22653hr) pushed to remote. Purple-tinted rows = contact stands 1A/1B/1C filling up under APEX.",detail:"Contact stands: 5 flights (hist) \u2192 21 flights (APEX). Long GT: all moved remote."},
+      {id:3,color:"#38BDF8",icon:"3",title:"Rapid Turnaround Optimization",desc:"Blue bars = quick turns (\u226465min GT). These need PBB for fast boarding. Watch them pack into the top zone under APEX.",detail:"Quick turns on PBB: 34/63 (hist) \u2192 55/63 (APEX, +33pp)"},
+    ];
+    function App(){
+      const[mode,setMode]=useState("model");const[hover,setHover]=useState(null);
+      const[showLabels,setShowLabels]=useState(false);const[insight,setInsight]=useState(null);
+      const getStand=(f)=>mode==="hist"?f.hs:f.ms;
+      const usedStands=useMemo(()=>{const s=new Set();flights.forEach(f=>s.add(getStand(f)));return STAND_ORDER.filter(x=>s.has(x));},[mode]);
+      const ROW_H=22,LEFT=52,TOP=40,chartW=1100;
+      const chartH=usedStands.length*ROW_H;
+      const xScale=(min)=>LEFT+((min-T_START)/T_RANGE)*(chartW-LEFT);
+      const yScale=(stand)=>TOP+usedStands.indexOf(stand)*ROW_H;
+      const ops=flights.filter(f=>!f.pre);
+      const pbbCount=ops.filter(f=>S_PBB.has(getStand(f))).length;
+      const shortCount=ops.filter(f=>S_SHORT.has(getStand(f))).length;
+      const flTotal=ops.filter(f=>f.lf>=0.90&&f.gt<=75);
+      const flPbb=flTotal.filter(f=>S_PBB.has(getStand(f))).length;
+      const qtTotal=ops.filter(f=>f.gt<=65);
+      const qtPbb=qtTotal.filter(f=>S_PBB.has(getStand(f))).length;
+      const hours=[];for(let h=0;h<=24;h++)hours.push(h*60);
+      const pbbBandEnd=usedStands.indexOf("8")>=0?yScale("8")+ROW_H:TOP+6*ROW_H;
+      const shortBandStart=usedStands.indexOf("1A")>=0?yScale("1A"):0;
+      const shortBandEnd=usedStands.indexOf("1C")>=0?yScale("1C")+ROW_H:0;
+      const toggleInsight=(id)=>{setInsight(prev=>prev===id?null:id);};
+      const highlightCount=insight?flights.filter(f=>isInsightFlight(f,insight,mode)).length:0;
+      return(
+        <div className="min-h-screen text-white" style={{background:'linear-gradient(145deg,#0B0F1A 0%,#111827 40%,#0F1629 100%)'}}>
+          <div className="max-w-full mx-auto px-4 pt-6 pb-2">
+            <div id="top"/>
+            <div className="flex items-start justify-between mb-4 flex-wrap gap-3">
+              <div>
+                <div className="flex items-center gap-2 mb-1"><div className="w-2 h-2 rounded-full bg-sky-400 animate-pulse"/><span className="text-[10px] tracking-[0.2em] text-sky-400 uppercase font-bold">APEX v5.7</span><span className="text-[10px] text-slate-600">&middot;</span><span className="text-[10px] text-slate-500">Qamia FENNEQ</span></div>
+                <h1 className="text-xl font-black text-white tracking-tight">Stand Allocation Gantt &mdash; August 29, 2025</h1>
+                <p className="text-xs text-slate-400">Busiest day: 172 OPS flights + 10 pre-day &middot; 46 stands active</p>
+              </div>
+              <div className="flex flex-col items-end gap-2">
+                <div className="flex gap-2">
+                  <button onClick={()=>setMode("hist")} className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${mode==="hist"?"bg-slate-600 text-white shadow-lg":"bg-slate-800 text-slate-400 hover:text-white"}`}>Historical</button>
+                  <button onClick={()=>setMode("model")} className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${mode==="model"?"bg-sky-500 text-white shadow-lg shadow-sky-500/30":"bg-slate-800 text-slate-400 hover:text-white"}`}>APEX Model</button>
+                </div>
+                <label className="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" checked={showLabels} onChange={e=>setShowLabels(e.target.checked)} className="accent-sky-400 w-3 h-3"/><span className="text-[10px] text-slate-400">Show flight labels</span></label>
+              </div>
+            </div>
+            <div className="grid grid-cols-6 gap-3 mb-4">
+              {[["PBB Gates",pbbCount,mode==="hist"?"of 63 hist":"of 78 apex",mode==="model"],["Contact",shortCount,mode==="hist"?"of 5 hist":"of 21 apex",mode==="model"],["PBB+Contact",pbbCount+shortCount,`${((pbbCount+shortCount)/172*100).toFixed(0)}% of flights`,mode==="model"],["Full Load\u2192PBB",`${flPbb}/${flTotal.length}`,`${pct(flPbb,flTotal.length)}%`,mode==="model"],["Quick Turn\u2192PBB",`${qtPbb}/${qtTotal.length}`,`${pct(qtPbb,qtTotal.length)}%`,mode==="model"],["Total OPS",ops.length,"172 flights",false]].map(([label,val,sub,accent])=>(
+                <div key={label} className="bg-slate-900/80 border border-slate-800/60 rounded-xl px-3 py-2"><div className="text-[8px] tracking-[0.12em] text-slate-500 uppercase">{label}</div><div className={`text-lg font-black ${accent?'text-sky-400':'text-white'}`}>{val}</div><div className="text-[9px] text-slate-500">{sub}</div></div>
+              ))}
+            </div>
+            <div className="flex items-center gap-2 mb-3 px-1">
+              <span className="text-[9px] text-slate-500 uppercase tracking-wider font-bold mr-1">Highlight insight:</span>
+              {INSIGHTS.map(ins=>(
+                <button key={ins.id} onClick={()=>toggleInsight(ins.id)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all duration-200 border ${insight===ins.id?'bg-slate-800 text-white shadow-lg':'border-slate-700/50 bg-slate-900/60 text-slate-400 hover:text-white hover:border-slate-600'}`} style={insight===ins.id?{borderColor:ins.color,boxShadow:`0 0 12px ${ins.color}33`}:{borderColor:'rgba(51,65,85,0.5)'}}>
+                  <span className="w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-black" style={{background:insight===ins.id?ins.color:'#334155',color:insight===ins.id?'#fff':'#94A3B8'}}>{ins.icon}</span>
+                  {ins.title}
+                </button>
+              ))}
+              {insight&&<button onClick={()=>setInsight(null)} className="text-[9px] text-slate-500 hover:text-white ml-2 underline">Clear</button>}
+            </div>
+            {insight&&(()=>{const ins=INSIGHTS.find(i=>i.id===insight);return(
+              <div className="mb-3 px-4 py-2.5 rounded-xl border flex items-start gap-3" style={{background:`${ins.color}08`,borderColor:`${ins.color}40`}}>
+                <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-black shrink-0 mt-0.5" style={{background:ins.color}}>{ins.icon}</div>
+                <div><div className="text-xs font-bold text-white">{ins.title}</div><div className="text-[11px] text-slate-300 mt-0.5">{ins.desc}</div><div className="text-[10px] font-mono mt-1" style={{color:ins.color}}>{ins.detail} &mdash; {highlightCount} flights highlighted</div></div>
+              </div>);})()}
+            <div className="bg-slate-900/60 border border-slate-800/60 rounded-2xl p-3 overflow-x-auto">
+              <svg width={chartW} height={chartH+TOP+60} className="select-none">
+                <defs><filter id="glow"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+                <rect x={LEFT} y={TOP} width={chartW-LEFT} height={pbbBandEnd-TOP} fill="#38BDF8" opacity={0.05} rx={4}/>
+                {shortBandStart>0&&<rect x={LEFT} y={shortBandStart} width={chartW-LEFT} height={shortBandEnd-shortBandStart} fill="#A78BFA" opacity={insight===2?0.12:0.04} rx={4}/>}
+                <text x={LEFT+6} y={TOP+10} fill="#38BDF8" fontSize={9} opacity={0.6} fontWeight="bold" letterSpacing="0.5">PBB GATES</text>
+                {shortBandStart>0&&<React.Fragment><line x1={LEFT} y1={shortBandStart} x2={chartW} y2={shortBandStart} stroke="#A78BFA" strokeWidth={insight===2?1:0.5} opacity={insight===2?0.6:0.3}/><text x={LEFT+6} y={shortBandStart+10} fill="#A78BFA" fontSize={9} opacity={insight===2?0.8:0.5} fontWeight="bold" letterSpacing="0.5">CONTACT</text></React.Fragment>}
+                {usedStands.indexOf("14")>=0&&<React.Fragment><line x1={LEFT} y1={yScale("14")} x2={chartW} y2={yScale("14")} stroke="#64748B" strokeWidth={0.5} opacity={0.3}/><text x={LEFT+6} y={yScale("14")+10} fill="#64748B" fontSize={9} opacity={0.4} fontWeight="bold" letterSpacing="0.5">REMOTE</text></React.Fragment>}
+                {usedStands.indexOf("50")>=0&&<React.Fragment><line x1={LEFT} y1={yScale("50")} x2={chartW} y2={yScale("50")} stroke="#A8896A" strokeWidth={0.5} opacity={0.3}/><text x={LEFT+6} y={yScale("50")+10} fill="#A8896A" fontSize={9} opacity={0.4} fontWeight="bold" letterSpacing="0.5">CARGO</text></React.Fragment>}
+                {hours.filter(h=>h>=T_START&&h<=T_END).map(h=>(<g key={h}><line x1={xScale(h)} y1={TOP-5} x2={xScale(h)} y2={TOP+chartH} stroke="#1E293B" strokeWidth={h%360===0?1:0.5}/><text x={xScale(h)} y={TOP-10} fill="#64748B" fontSize={9} textAnchor="middle" fontFamily="monospace">{toTime(h)}</text></g>))}
+                {usedStands.map((s,i)=>{const y=yScale(s);const isPBB=S_PBB.has(s);const isShort=S_SHORT.has(s);return(<g key={s}>{i>0&&<line x1={LEFT} y1={y} x2={chartW} y2={y} stroke="#1E293B" strokeWidth={0.3}/>}<text x={LEFT-4} y={y+ROW_H/2+3} fill={isPBB?"#38BDF8":isShort?"#A78BFA":"#64748B"} fontSize={9} textAnchor="end" fontWeight={isPBB?"bold":"normal"} fontFamily="monospace">{s}</text></g>);})}
+                {flights.map((f,idx)=>{const stand=getStand(f);if(!usedStands.includes(stand))return null;const y=yScale(stand);const x1=xScale(Math.max(f.sta,T_START));const x2=xScale(Math.min(f.std,T_END));const w=Math.max(x2-x1,2);const col=flightColor(f);const isHovered=hover===idx;const isHL=isInsightFlight(f,insight,mode);const dimmed=insight&&!isHL&&!f.pre;return(<g key={idx} onMouseEnter={()=>setHover(idx)} onMouseLeave={()=>setHover(null)} style={{cursor:'pointer'}}><rect x={x1} y={y+2} width={w} height={ROW_H-4} fill={col} rx={3} opacity={f.pre?0.25:dimmed?0.12:0.85} stroke={isHovered?"#fff":isHL?"#fff":"none"} strokeWidth={isHovered?1.5:isHL?0.8:0} filter={isHL&&!f.pre?"url(#glow)":undefined}/>{showLabels&&w>30&&!f.pre&&!dimmed&&(<text x={x1+3} y={y+ROW_H/2+3} fill="white" fontSize={7} opacity={0.8} fontFamily="monospace">{f.airl}</text>)}</g>);})}
+                {hover!==null&&(()=>{const f=flights[hover];const stand=getStand(f);const y=yScale(stand);const x=xScale((f.sta+Math.min(f.std,T_END))/2);const ty=Math.max(TOP+10,y-75);const tx=Math.min(Math.max(x-95,LEFT),chartW-200);const isFL=f.lf>=0.90&&f.gt<=75;const isQT=f.gt<=65;const isLG=f.gt>=180;const tag=f.pre?"PRE-DAY":f.lt==="Cgo"?"CARGO":isFL?"FULL LOAD":isQT?"QUICK TURN":isLG?"LONG GT":"PAX";const tagCol=f.pre?"#475569":f.lt==="Cgo"?"#A8896A":isFL?"#10B981":isQT?"#38BDF8":isLG?"#F59E0B":"#818CF8";return(<g><rect x={tx} y={ty} width={200} height={72} fill="#0F172A" stroke="#334155" rx={6} filter="url(#glow)"/><rect x={tx+6} y={ty+6} width={56} height={14} fill={tagCol} rx={3} opacity={0.9}/><text x={tx+34} y={ty+15} fill="#fff" fontSize={7} textAnchor="middle" fontWeight="bold">{tag}</text><text x={tx+68} y={ty+15} fill="#38BDF8" fontSize={10} fontWeight="bold">{f.airl} &middot; Stand {stand}</text><text x={tx+8} y={ty+32} fill="#94A3B8" fontSize={9} fontFamily="monospace">{toTime(Math.max(0,f.sta))} &rarr; {toTime(Math.min(f.realStd,1440))} &middot; GT {f.gt}min</text><text x={tx+8} y={ty+46} fill="#94A3B8" fontSize={9}>PAX: {f.pax} &middot; LF: {(f.lf*100).toFixed(0)}% &middot; {f.lt}</text><text x={tx+8} y={ty+60} fill="#64748B" fontSize={8}>Hist: {f.hs} &rarr; Model: {f.ms} {f.hs!==f.ms?"\u2726 reassigned":""}</text></g>);})()}
+              </svg>
+            </div>
+            <div className="flex flex-wrap items-center gap-5 mt-3 px-2">
+              <span className="text-[9px] text-slate-500 uppercase tracking-wider font-bold mr-1">Flight Type (color)</span>
+              {[["#10B981","Full Load"],["#38BDF8","Quick Turn"],["#818CF8","Regular PAX"],["#F59E0B","Long GT"],["#A8896A","Cargo"],["#475569","Pre-day"]].map(([c,l])=>(<div key={l} className="flex items-center gap-1.5"><span className="w-3 h-2 rounded-sm" style={{background:c,opacity:c==="#475569"?0.5:0.8}}/><span className="text-[9px] text-slate-400">{l}</span></div>))}
+              <span className="text-[9px] text-slate-600 mx-2">|</span>
+              <span className="text-[9px] text-slate-500 uppercase tracking-wider font-bold mr-1">Stand Zone (y-axis)</span>
+              {[["#38BDF8","PBB {3\u20138}"],["#A78BFA","Contact {1A\u20131C}"],["#64748B","Remote"],["#A8896A","Cargo"]].map(([c,l])=>(<div key={l} className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{background:c,opacity:0.3}}/><span className="text-[9px] text-slate-500">{l}</span></div>))}
+            </div>
+            <div className="text-[9px] text-slate-600 italic mt-1 px-2">Color = flight priority (fixed). Y-axis = assigned stand. Toggle Historical &harr; APEX to see same-colored flights shift between zones. Click insights above to spotlight patterns.</div>
+            <div className="mt-6 bg-slate-900/60 border border-slate-800/50 rounded-2xl p-5">
+              <h3 className="text-xs font-bold text-white tracking-wide mb-3 flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-sky-400"/>Why APEX Outperforms &mdash; Click to Highlight in Chart &uarr;</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-[11px] text-slate-300 leading-relaxed">
+                {INSIGHTS.map(ins=>(<div key={ins.id} onClick={()=>{toggleInsight(ins.id);document.getElementById('top').scrollIntoView({behavior:'smooth'});}} className={`cursor-pointer rounded-xl p-3 border transition-all duration-200 ${insight===ins.id?'border-opacity-60 bg-slate-800/60':'border-slate-800/30 bg-transparent hover:bg-slate-800/30'}`} style={insight===ins.id?{borderColor:ins.color}:{borderColor:'transparent'}}><div className="font-bold text-xs mb-1.5 flex items-center gap-2" style={{color:ins.color}}><span className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black text-white" style={{background:ins.color}}>{ins.icon}</span>{ins.title}</div><div>{ins.desc}</div><div className="mt-1.5 text-[10px] font-mono" style={{color:ins.color}}>{ins.detail}</div></div>))}
+              </div>
+              <div className="mt-4 pt-3 border-t border-slate-800/50 text-[9px] text-slate-500 leading-relaxed">
+                <span className="text-slate-400 font-semibold">Technical note:</span> Solved in 3.8s using HiGHS MIP with greedy warm start. 172 OPS flights &times; 46 stands &rarr; ~4,200 binary variables, ~28,000 constraints. Zero constraint violations. Historical had 2 buffer violations (&lt;15min gap) on this day. Pre-day aircraft locked as immovable constraints.
+              </div>
+            </div>
+            <div className="text-center text-[9px] text-slate-600 mt-4 pb-4 font-mono">
+              APEX v5.7 &middot; <a href="https://qamia.co" className="text-sky-600 hover:text-sky-400">Qamia FENNEQ</a> &middot; Sharjah International Airport &middot; Aug 29, 2025
+            </div>
+          </div>
+        </div>
+      );
+    }
+    ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+  </script>
+</body>
+</html>
