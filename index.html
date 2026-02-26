@@ -67,7 +67,7 @@
       const[mode,setMode]=useState("model");const[hover,setHover]=useState(null);
       const[showLabels,setShowLabels]=useState(false);const[insight,setInsight]=useState(null);
       const chartRef=useRef(null);const[containerW,setContainerW]=useState(1100);
-      useEffect(()=>{if(!chartRef.current)return;const ro=new ResizeObserver(entries=>{for(const e of entries){const w=Math.floor(e.contentRect.width)-24;if(w>200)setContainerW(w);}});ro.observe(chartRef.current);return()=>ro.disconnect();},[]);
+      useEffect(()=>{if(!chartRef.current)return;const ro=new ResizeObserver(entries=>{for(const e of entries){const w=Math.floor(e.contentRect.width);if(w>200)setContainerW(w);}});ro.observe(chartRef.current);return()=>ro.disconnect();},[]);
       const getStand=(f)=>mode==="hist"?f.hs:f.ms;
       const usedStands=useMemo(()=>{const s=new Set();flights.forEach(f=>s.add(getStand(f)));return STAND_ORDER.filter(x=>s.has(x));},[mode]);
       const ROW_H=22,LEFT=52,TOP=40,chartW=containerW;
