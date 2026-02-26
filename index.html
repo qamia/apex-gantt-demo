@@ -67,7 +67,7 @@
       const[mode,setMode]=useState("model");const[hover,setHover]=useState(null);
       const[showLabels,setShowLabels]=useState(false);const[insight,setInsight]=useState(null);
       const chartRef=useRef(null);const[containerW,setContainerW]=useState(1100);
-      useEffect(()=>{if(!chartRef.current)return;const ro=new ResizeObserver(entries=>{for(const e of entries){const w=Math.floor(e.contentRect.width);if(w>200)setContainerW(w);}});ro.observe(chartRef.current);return()=>ro.disconnect();},[]);
+      useEffect(()=>{if(!chartRef.current)return;const ro=new ResizeObserver(entries=>{for(const e of entries){const w=Math.floor(e.contentRect.width)-26;if(w>200)setContainerW(w);}});ro.observe(chartRef.current);return()=>ro.disconnect();},[]);
       const getStand=(f)=>mode==="hist"?f.hs:f.ms;
       const usedStands=useMemo(()=>{const s=new Set();flights.forEach(f=>s.add(getStand(f)));return STAND_ORDER.filter(x=>s.has(x));},[mode]);
       const ROW_H=22,LEFT=52,TOP=40,chartW=containerW;
@@ -125,7 +125,7 @@
                 <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-black shrink-0 mt-0.5" style={{background:ins.color}}>{ins.icon}</div>
                 <div><div className="text-xs font-bold text-white">{ins.title}</div><div className="text-[11px] text-slate-300 mt-0.5">{ins.desc}</div><div className="text-[10px] font-mono mt-1" style={{color:ins.color}}>{ins.detail} &mdash; {highlightCount} flights highlighted</div></div>
               </div>);})()}
-            <div ref={chartRef} className="bg-slate-900/60 border border-slate-800/60 rounded-2xl p-3 overflow-x-auto">
+            <div ref={chartRef}><div className="bg-slate-900/60 border border-slate-800/60 rounded-2xl p-3 overflow-x-auto">
               <svg width={chartW} height={chartH+TOP+60} className="select-none">
                 <defs><filter id="glow"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
                 <rect x={LEFT} y={TOP} width={chartW-LEFT} height={pbbBandEnd-TOP} fill="#38BDF8" opacity={0.05} rx={4}/>
@@ -139,7 +139,7 @@
                 {flights.map((f,idx)=>{const stand=getStand(f);if(!usedStands.includes(stand))return null;const y=yScale(stand);const x1=xScale(Math.max(f.sta,T_START));const x2=xScale(Math.min(f.std,T_END));const w=Math.max(x2-x1,2);const col=flightColor(f);const isHovered=hover===idx;const isHL=isInsightFlight(f,insight,mode);const dimmed=insight&&!isHL&&!f.pre;return(<g key={idx} onMouseEnter={()=>setHover(idx)} onMouseLeave={()=>setHover(null)} style={{cursor:'pointer'}}><rect x={x1} y={y+2} width={w} height={ROW_H-4} fill={col} rx={3} opacity={f.pre?0.25:dimmed?0.12:0.85} stroke={isHovered?"#fff":isHL?"#fff":"none"} strokeWidth={isHovered?1.5:isHL?0.8:0} filter={isHL&&!f.pre?"url(#glow)":undefined}/>{showLabels&&w>30&&!f.pre&&!dimmed&&(<text x={x1+3} y={y+ROW_H/2+3} fill="white" fontSize={7} opacity={0.8} fontFamily="monospace">{f.airl}</text>)}</g>);})}
                 {hover!==null&&(()=>{const f=flights[hover];const stand=getStand(f);const y=yScale(stand);const x=xScale((f.sta+Math.min(f.std,T_END))/2);const ty=Math.max(TOP+10,y-75);const tx=Math.min(Math.max(x-95,LEFT),chartW-200);const isFL=f.lf>=0.90&&f.gt<=75;const isQT=f.gt<=65;const isLG=f.gt>=180;const tag=f.pre?"PRE-DAY":f.lt==="Cgo"?"CARGO":isFL?"FULL LOAD":isQT?"QUICK TURN":isLG?"LONG GT":"PAX";const tagCol=f.pre?"#475569":f.lt==="Cgo"?"#A8896A":isFL?"#10B981":isQT?"#38BDF8":isLG?"#F59E0B":"#818CF8";return(<g><rect x={tx} y={ty} width={200} height={72} fill="#0F172A" stroke="#334155" rx={6} filter="url(#glow)"/><rect x={tx+6} y={ty+6} width={56} height={14} fill={tagCol} rx={3} opacity={0.9}/><text x={tx+34} y={ty+15} fill="#fff" fontSize={7} textAnchor="middle" fontWeight="bold">{tag}</text><text x={tx+68} y={ty+15} fill="#38BDF8" fontSize={10} fontWeight="bold">{f.airl} &middot; Stand {stand}</text><text x={tx+8} y={ty+32} fill="#94A3B8" fontSize={9} fontFamily="monospace">{toTime(Math.max(0,f.sta))} &rarr; {toTime(Math.min(f.realStd,1440))} &middot; GT {f.gt}min</text><text x={tx+8} y={ty+46} fill="#94A3B8" fontSize={9}>PAX: {f.pax} &middot; LF: {(f.lf*100).toFixed(0)}% &middot; {f.lt}</text><text x={tx+8} y={ty+60} fill="#64748B" fontSize={8}>Hist: {f.hs} &rarr; Model: {f.ms} {f.hs!==f.ms?"\u2726 reassigned":""}</text></g>);})()}
               </svg>
-            </div>
+            </div></div>
             <div className="flex flex-wrap items-center gap-5 mt-3 px-2">
               <span className="text-[9px] text-slate-500 uppercase tracking-wider font-bold mr-1">Flight Type (color)</span>
               {[["#10B981","Full Load"],["#38BDF8","Quick Turn"],["#818CF8","Regular PAX"],["#F59E0B","Long GT"],["#A8896A","Cargo"],["#475569","Pre-day"]].map(([c,l])=>(<div key={l} className="flex items-center gap-1.5"><span className="w-3 h-2 rounded-sm" style={{background:c,opacity:c==="#475569"?0.5:0.8}}/><span className="text-[9px] text-slate-400">{l}</span></div>))}
